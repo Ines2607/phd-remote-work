@@ -15,18 +15,24 @@ The main data source is mobile signals data (2019-2023) provided by Habidatum.
 - Propose tools for policymakers to simulate and compare scenarios based on policy decisions.
 
 ## Data Sources  
-- Mobility signals from Unicast provided by Habidatum 
-- Israel Census 2022  
+- Mobility signals from Unicast provided by Habidatum (not publicly available)
+- Israel Census 2022
 - GTFS files  
 - Real Estate data (2017-2024)
 - Administrative boundaries at different scales  
 - Annual Labor force surveys
 
-## Repository Structure  
-- `notebooks/` - Jupyter notebooks for data analysis and visualization  
-- `data/` - Datasets used in the research (access restrictions may apply)  
-- `scripts/` - Helper scripts for preprocessing and analysis  
+## Repository Structure 
+- `XXX-(load/process/research)-step-name` - a step in analysis
+- `data/` - Raw datasets used in the research (access restrictions may apply)    
 - `results/` - Outputs and findings (graphs, tables, etc.)  
+
+
+## Notebooks Types
+- `XXX-the name of step` - the notebook with cleaned code that runs a part of research.Some data might be unavailable.
+- `name-Demo` - demonstation notebook that is aimed for public use. It explains the logic and doesn't require private data.  
+- `the name of step-research` - intermediate step before creating clean notebook. Mostly published without cleaning
+
 
 ## How to Use  
 1. Clone the repository:  
