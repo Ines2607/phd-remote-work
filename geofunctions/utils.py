@@ -20,8 +20,8 @@ def get_path(data_type, source, filename, ini_file="settings.ini"):
 
     Args:
         section (str): The section in the ini file (e.g., 'Paths').
-        key (str): The key within the section to retrieve the base path.
-        subfolder_name (str, optional): A subfolder to append to the base path.
+        data_type (str): type of data: processed/raw.
+        source (str): A subfolder to append to the base path: census/gtfs/nadlan etc.
         ini_file (str): The path to the ini configuration file.
 
     Returns:
