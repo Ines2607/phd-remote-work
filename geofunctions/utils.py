@@ -14,7 +14,7 @@ import configparser
 # from matplotlib import pyplot as plt
 
 
-def get_path(data_type, source, filename, ini_file="settings.ini"):
+def get_path(data_type, source, filename="", ini_file="settings.ini"):
     """
     Reads a path from the settings.ini file and optionally appends a subfolder.
 
@@ -28,7 +28,7 @@ def get_path(data_type, source, filename, ini_file="settings.ini"):
         str: The full path to the desired directory.
     """
     config = configparser.ConfigParser()
-    config.read(ini_file)
+    config.read(f"../{ini_file}")
     section = "Paths"
     if not config.has_section(section) or not config.has_option(section, data_type):
         raise ValueError(
