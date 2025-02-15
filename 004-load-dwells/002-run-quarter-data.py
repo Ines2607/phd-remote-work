@@ -11,7 +11,7 @@ import datetime
 import pygeohash
 from shapely import wkb
 from geofunctions import utils
-
+import ipdb
 
 ## only inside gushdan
 def filter_dwells_by_coords(df):
@@ -136,9 +136,11 @@ for MONTH_NUMBER in list_month_numbers:
 
         df = dd.read_parquet(file_path, filters=[("month", "==", MONTH_NUMBER)])
         print(f"we read file for {MONTH} ")
+        print(f"original size {df.shape}")
         # Basic filters
 
         df_filt = filter_dwells_by_coords(df)
+        print(f"after filter by coords size {df_filt.shape}")
 
         df_filt = df_filt.compute()
 
@@ -160,7 +162,7 @@ for MONTH_NUMBER in list_month_numbers:
         )
 
         df_filtered_full = df_filtered_full[
-            (df_filtered_full.classification.isin(["AREA_DWELL"]))
+            (df_filtered_full.classification.isin(["AREA_DWELL"])|(df_filtered_full.classification.isin(["DWELL"])))
         ]
 
         df_filtered_full = df_filtered_full.set_crs(4326)
@@ -174,7 +176,7 @@ for MONTH_NUMBER in list_month_numbers:
                 df_filtered_full["centroid_longitude"],
             )
         ]
-
+       
         df_filtered_full["date"] = pd.to_datetime(
             df_filtered_full["local_date_time"]
         ).dt.date  # start time
@@ -192,13 +194,15 @@ for MONTH_NUMBER in list_month_numbers:
 
         # Apply the function
         df_filtered_full = add_time_flags(df_filtered_full)
+        print(df_filtered_full.shape)
+        # ipdb.set_trace()
 
         # Create filters for home and work hours
 
-        filter_string_home = (df_filtered_full.classification.isin(["AREA_DWELL"])) & (
+        filter_string_home = (df_filtered_full.classification.isin(["AREA_DWELL"])|(df_filtered_full.classification.isin(["DWELL"]))) & (
             df_filtered_full["flag_night"]
         )
-        filter_string_work = (df_filtered_full.classification.isin(["AREA_DWELL"])) & (
+        filter_string_work = (df_filtered_full.classification.isin(["AREA_DWELL"])|(df_filtered_full.classification.isin(["DWELL"]))) & (
             df_filtered_full["flag_work_hours"]
         )
 
