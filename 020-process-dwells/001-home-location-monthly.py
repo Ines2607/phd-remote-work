@@ -1,3 +1,16 @@
+"""
+This script processes dwelling data to identify home locations and analyze mobility patterns.
+It performs the following main tasks:
+1. Filters and processes dwelling data for a specified month
+2. Identifies home locations based on nighttime and Shabbat activity patterns
+3. Calculates various metrics including:
+   - Spatial variance of movements
+   - Work-from-home patterns
+   - Population correlations
+   - User frequency statistics
+4. Saves results to geojson and csv files with summary statistics
+"""
+
 import os
 import argparse
 import numpy as np
@@ -6,7 +19,27 @@ import pandas as pd
 from geofunctions import utils
 
 
-def calculate_frequencies(df):
+def calculate_frequencies(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculate frequency statistics for home and work hours per user.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing hourly dwelling data with the following columns:
+            - identifier: unique user ID
+            - hour: hour of the day (0-23)
+            - flag_home_hour: boolean indicating if hour is typically spent at home
+            - flag_work_hour: boolean indicating if hour is typically spent at work
+
+    Returns:
+        pd.DataFrame: DataFrame containing frequency counts per user with columns:
+            - identifier: unique user ID
+            - freq_home_hours_count: number of frequent home hours
+            - freq_work_hours_count: number of frequent work hours
+            
+    Notes:
+        A "frequent" hour is defined as occurring at least 2 times within the month
+        for a given user at a given hour of day.
+    """
     # Compute frequencies for home hours
     home_hours_freq = (
         df.loc[df["flag_home_hour"]]
@@ -38,13 +71,15 @@ def calculate_frequencies(df):
         .reset_index(name="freq_work_hours_count")
     )
 
-    # Merge results for home and work counts
+    # Merge home and work frequencies
     result = pd.merge(
-        freq_home_hours_count, freq_work_hours_count, on="identifier", how="inner"
+        freq_home_hours_count, 
+        freq_work_hours_count, 
+        on="identifier", 
+        how="inner"
     ).fillna(0)
 
     return result
-
 
 # Set up argument parsing
 parser = argparse.ArgumentParser(
@@ -62,9 +97,11 @@ dict_key_metrics = dict()
 
 
 df_filtered_good = pd.read_parquet(f"{path_dir}/data_filtered_{MONTH}.parquet")
+if df_filtered_good.empty:
+    raise ValueError(f"No data found for month {MONTH}")
 
 df_filtered_dwells = utils.make_gdf(df_filtered_good, geometry="the_geom")
-print("read file successfully")
+print(f"Read file successfully. Shape: {df_filtered_dwells.shape}")
 
 # user-geohash statistic
 user_geohash_desc = (
@@ -90,7 +127,9 @@ df_filtered_dwells = df_filtered_dwells.merge(
     how="inner",
     on=["identifier", "geohash"],
 )
-print("top 5 geohashes left for user")
+if df_filtered_dwells.empty:
+    raise ValueError("No data remaining after filtering top 5 geohashes")
+print(f"Top 5 geohashes left for user. Shape: {df_filtered_dwells.shape}")
 
 df_filtered_dwells["date"] = pd.to_datetime(df_filtered_dwells["date"])
 
@@ -115,13 +154,11 @@ df_hours["flag_shabbat"] = (
     (df_hours["date"].dt.dayofweek == 5) & (df_hours["hour"] < 18)
 ) | ((df_hours["date"].dt.dayofweek == 4) & (df_hours["hour"] >= 18))
 df_hours["flag_weekend"] = df_hours["date"].dt.weekday.isin([4, 5])
+df_hours["flag_night"] = (df_hours["hour"] <= 8) | (df_hours["hour"] >= 22)
 df_hours["flag_work_hour"] = (~df_hours["flag_weekend"]) & (
     df_hours["hour"].apply(lambda x: (x <= 16) & (x >= 11))
 )
 df_hours["flag_home_hour"] = df_hours["flag_night"] | df_hours["flag_weekend"]
-
-df_hours["flag_night"] = (df_hours["hour"] <= 8) | (df_hours["hour"] >= 22)
-
 
 # nighttime geohashes
 geohash_ident_night = (
@@ -129,9 +166,10 @@ geohash_ident_night = (
     .groupby(["identifier", "geohash"])["date"]
     .agg(["count", "nunique"])
 )
-
+# keep only users with at least 2 dwells (redundant!)
 geohash_ident_night = geohash_ident_night[
     geohash_ident_night["count"] > 1
+
 ]  # if it is still noisy then we use ninique
 geohash_ident_night = geohash_ident_night.reset_index()
 geohash_ident_night["rank_geohash"] = geohash_ident_night.groupby(["identifier"])[
@@ -179,8 +217,10 @@ geohash_ident_night_shbt_homes = geohash_ident_night_shbt[
     (geohash_ident_night_shbt.rank_weighted == 1)  # first from two ranks
     & (geohash_ident_night_shbt.shabbat_hours_counts >= 1)  # new filter
 ]
+if geohash_ident_night_shbt_homes.empty:
+    raise ValueError("No home locations identified after filtering")
 dict_key_metrics["num_homes"] = geohash_ident_night_shbt_homes.shape[0]
-print("selected home locations")
+print(f"Selected {dict_key_metrics['num_homes']} home locations")
 
 # aggregate by geohash and add geometry
 geohash_homes = (
@@ -282,7 +322,7 @@ geohash_user_home_hour = geohash_ident_night_shbt_homes[
     how="inner",
     on=["identifier", "geohash"],
 )
-# work hours at home- ( different metrics because we dont know which one will work best for remote working)
+# work hours at home- ( try different metrics because we dont know which one will work best for remote working)
 user_home_days = (
     df_hours[df_hours["flag_home_hour"]]
     .groupby(["identifier"])["date"]
@@ -304,8 +344,7 @@ work_hours_home_day = (
     ]
     .groupby(["identifier", "geohash", "date"])
     .size()
-    .rename()
-    .reset_index()
+    .reset_index(name="count")
 )
 user_home_work_days = (
     work_hours_home_day.groupby(["identifier", "geohash"])["date"]
@@ -388,15 +427,22 @@ dict_shares = (
 dict_key_metrics = {**dict_key_metrics, **dict_shares}
 
 # Run hours freq calculation
+
 df_user_freq = calculate_frequencies(df_hours)
+if df_user_freq.empty:
+    raise ValueError("No frequency data calculated")
+
 list_user_freq = df_user_freq[
     (df_user_freq.freq_work_hours_count >= 2)
     & (df_user_freq.freq_home_hours_count >= 2)
 ]["identifier"]
+if len(list_user_freq) == 0:
+    raise ValueError("No frequent users found after filtering")
 geohash_ident_night_shbt_homes["flag_frequent_user"] = (
     geohash_ident_night_shbt_homes.identifier.isin(list_user_freq)
 )
 dict_key_metrics["freq_users"] = len(list_user_freq)
+print(f"Found {dict_key_metrics['freq_users']} frequent users")
 
 print("start saving results")
 # Save results
@@ -408,24 +454,15 @@ homes_stat_area.to_file(
 geohash_ident_night_shbt_homes.to_csv(
     os.path.join(save_dir, f"home/home_geohashes_night_shabbat_{MONTH}.csv")
 )
-print(
-    f"""Month: {MONTH}, num_homes:{dict_key_metrics["num_homes"]},
-      corr_pop_homes:{dict_key_metrics['home_pop_corr']},
-      spatial_variance:{dict_key_metrics['spatial_variance']},
-        share home dwells in work hours:{dict_key_metrics['share_home_work_hours']}, 
-        share remote work of all home_days:{dict_key_metrics["share_work_in_home_days"]}, 
-        share remote work of all work days:{dict_key_metrics["share_home_work_days"]},
-        share home hours in home dwells:{dict_key_metrics["share_home_hours_home"]}
-        frequent users:{dict_key_metrics["freq_users"]}\n"""
-)
+
 with open(os.path.join(save_dir, "logs_homes_new.txt"), "a") as file:
     file.write(
         f"""Month: {MONTH}, num_homes:{dict_key_metrics["num_homes"]},
-      corr_pop_homes:{dict_key_metrics['home_pop_corr']},
+       corr_pop_homes:{dict_key_metrics['home_pop_corr']},
       spatial_variance:{dict_key_metrics['spatial_variance']},
         share home dwells in work hours:{dict_key_metrics['share_home_work_hours']}, 
         share remote work of all home_days:{dict_key_metrics["share_work_in_home_days"]}, 
         share remote work of all work days:{dict_key_metrics["share_home_work_days"]},
-        share home hours in home dwells:{dict_key_metrics["share_home_hours_home"]}
+        share home hours in home dwells:{dict_key_metrics["share_home_hours_home"]},
         frequent users:{dict_key_metrics["freq_users"]}\n"""
     )
