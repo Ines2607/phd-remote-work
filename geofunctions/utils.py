@@ -3,7 +3,14 @@ import pygeohash
 import pyproj
 from shapely.geometry import Point, Polygon, MultiPolygon
 import geopandas as gpd
+import json
 from shapely.geometry import base
+from google.cloud import bigquery, storage
+from shapely.geometry.polygon import orient
+from shapely.validation import make_valid
+import re
+from shapely.geometry import Polygon, MultiPolygon, GeometryCollection
+from shapely.ops import unary_union
 
 # from shapely.geometry import shape, GeometryCollection
 from shapely import wkt, wkb
@@ -284,14 +291,48 @@ def clip_gdf(gdf, boundaries, geometry="geometry", how="inner"):
 
 
 def return_list_months_ok():
+
     return [
-        '201901', '201904', '201907', '201908', '201909', '201910', '201911',
-       '202001', '202002', '202003', '202004', '202005', '202006', '202007',
-       '202008', '202009', '202010', '202011', '202101', '202102', '202103',
-       '202104', '202105', '202106', '202107', '202108', '202109', '202110',
-       '202111', '202112', '202201', '202202', '202203', '202204', '202205',
-       '202206', '202207', '202208', '202209', '202210', '202211', '202301',
-       '202302', '202303', '202304', '202305', '202306', '202309'
+        "202001",
+        # "202002",
+        "202003",
+        # "202004",
+        "202005",
+        # "202006",
+        "202007",
+        "202008",
+        "202009",
+        "202010",
+        "202011",
+        "202102",
+        "202103",
+        "202104",
+        "202105",
+        "202106",
+        "202107",
+        # "202108",
+        # "202109",
+        # "202110",
+        # "202111",
+        "202112",
+        "202201",
+        "202202",
+        "202203",
+        "202204",
+        "202205",
+        # "202206",
+        "202207",
+        "202208",
+        "202209",
+        "202210",
+        "202211",
+        "202301",
+        "202302",
+        "202303",
+        "202304",
+        "202305",
+        "202306",
+        "202309",
     ]
 
 
@@ -329,3 +370,226 @@ def area_2fields(g):
 #     #     plt.show()
 
 #     return gdf_hex
+
+
+def clean_column_names(df):
+    """
+    Clean DataFrame column names to be BigQuery compatible:
+    - Replace forbidden characters with underscore (_)
+    - Remove leading/trailing underscores
+    - Force lower case (optional)
+    """
+
+    cleaned_columns = []
+
+    for col in df.columns:
+        # Replace any character that is not letter, number, or underscore
+        new_col = re.sub(r"[^a-zA-Z0-9_]", "_", col)
+        # Remove multiple underscores
+        new_col = re.sub(r"__+", "_", new_col)
+        # Strip leading and trailing underscores
+        new_col = new_col.strip("_")
+        # Optional: lowercase everything
+        new_col = new_col.lower()
+
+        cleaned_columns.append(new_col)
+
+    return cleaned_columns
+
+
+def fix_polygon_safe(polygon):
+    if polygon is None or polygon.is_empty:
+        return None
+    try:
+        polygon = orient(polygon, sign=-1.0)  # enforce CCW shell
+        shell = polygon.exterior
+        holes = [
+            r
+            for r in polygon.interiors
+            if Polygon(shell, [r]).is_valid and Polygon(r).within(Polygon(shell))
+        ]
+        return Polygon(shell, holes)
+    except Exception as e:
+        print(f"Failed to fix polygon: {e}")
+        return None
+
+def recreate_table_with_geometry(table_name: str, geog_column: str = "geometry"):
+    return read_query_to_dataframe(
+        f"""CREATE OR REPLACE TABLE {table_name} AS
+        SELECT *except({geog_column}),
+        st_geogfromtext({geog_column},make_valid=>True) {geog_column}
+        FROM {table_name} """
+    )
+
+
+def upload_table_to_bq(
+    df, dataset, table_name, geometry_column="geometry", project="phd-habidatum"
+):
+    """
+    Upload a dataframe to BigQuery.
+    If geometry_column is specified, fix geometries with make_valid, convert to WKT, and upload as GEOGRAPHY.
+
+    Args:
+        df (pd.DataFrame): dataframe to upload
+        dataset (str): BigQuery dataset name
+        table_name (str): Table name in BigQuery
+        geometry_column (str): Column name containing geometries (optional)
+        project (str): GCP project ID (default phd-habidatum)
+    """
+
+    client = bigquery.Client(project=project)
+    table_id = f"{dataset}.{table_name}"
+
+    df.columns = clean_column_names(df)
+
+    if geometry_column in df.columns:
+        print(f"geometry column '{geometry_column}' is detected in the dataset")
+        # Fix invalid geometries first
+
+        if df.crs != 4326:
+            print(f"{df.crs} found. Now convert to 4326")
+            df = df.to_crs(4326)
+
+        def fix_geom(geom):
+            if geom is None:
+                return None
+            try:
+                geom = make_valid(geom)
+                if isinstance(geom, GeometryCollection):
+                    print("geomcoll")
+                    # Keep only Polygon and MultiPolygon parts
+                    geom = unary_union(
+                        [make_valid(g) for g in geom.geoms if isinstance(g, (Polygon))]
+                    )
+                if isinstance(geom, Polygon):
+                    return fix_polygon_safe(geom)
+
+                elif isinstance(geom, MultiPolygon):
+                    fixed_polys = [
+                        fix_polygon_safe(p) for p in geom.geoms if p is not None
+                    ]
+                    fixed_polys = [p for p in fixed_polys if p and p.is_valid]
+                    return MultiPolygon(fixed_polys) if fixed_polys else None
+                if geom.is_valid:
+                    return geom
+            except Exception:
+                pass
+            return None
+
+        df[geometry_column] = df[geometry_column].apply(fix_geom)
+        df[geometry_column] = df[geometry_column].apply(lambda g: g.wkt if g else None)
+
+        job_config = bigquery.LoadJobConfig(
+            schema=[
+                bigquery.SchemaField(geometry_column, "GEOGRAPHY"),
+            ],
+            autodetect=True,
+        )
+    else:
+        print("No geometry, we autodetect columns")
+        job_config = bigquery.LoadJobConfig(autodetect=True)
+
+    job = client.load_table_from_dataframe(df, table_id, job_config=job_config)
+    job.result()
+
+    print(f"Table {table_id} is successfully uploaded.")
+
+
+def read_query_to_dataframe(query, project="phd-habidatum"):
+    """
+    Run a BigQuery SQL query and return results as a pandas DataFrame.
+
+    Args:
+        query (str): SQL query to execute.
+        project (str): GCP project ID (default "phd-habidatum").
+
+    Returns:
+        pd.DataFrame: query results
+    """
+    client = bigquery.Client(project=project)
+    job_config = bigquery.QueryJobConfig()
+    query_job = client.query(query, job_config=job_config)
+    df = query_job.to_dataframe()
+
+    print(f"Estimated bytes processed: {query_job.total_bytes_processed}")
+    print(f"Estimated cost: ${query_job.total_bytes_processed / 1e12 * 5:.4f}")
+    return df
+
+
+# def read_gcs_files_folder(
+#     project, bucket_name, prefix, extention=None
+# ):
+#     # Create clients
+#     storage_client = storage.Client(project=project)
+
+#     # Get the bucket
+#     bucket = storage_client.get_bucket(bucket_name)
+
+#     # List all blobs with the given prefix
+#     blobs = bucket.list_blobs(prefix=prefix)
+
+#     # Initialize list for all data
+#     all_data = []
+
+#     # Process each file
+#     for blob in blobs:
+#         if extention:
+#             if not blob.name.endswith(f".{extention}"):
+#                 continue
+#         print(f"Processing: {blob.name}")
+#         content = blob.download_as_text()
+
+#         # Parse each line as JSON
+#         for line in content.splitlines():
+#             if line.strip():
+#                 all_data.append(json.loads(line))
+
+#     # Convert to DataFrame
+#     df = pd.DataFrame(all_data)
+
+#     return df
+
+
+def read_gcs_files_folder(project, bucket_name, prefix, extention=None, file_name=None):
+    # Create client
+    storage_client = storage.Client(project=project)
+    bucket = storage_client.get_bucket(bucket_name)
+
+    all_data = []
+
+    def parse_content(content):
+        try:
+            # Try parsing entire file as JSON (works for GeoJSON, standard JSON)
+            return json.loads(content)
+        except json.JSONDecodeError:
+            # Otherwise parse line by line (works for NDJSON)
+            data = []
+            for line in content.splitlines():
+                if line.strip():
+                    data.append(json.loads(line))
+            return data
+
+    if file_name:
+        blob = bucket.blob(f"{prefix}/{file_name}" if prefix else file_name)
+        print(f"Processing only file: {blob.name}")
+        content = blob.download_as_text()
+        parsed = parse_content(content)
+        all_data = parsed
+        print(type(all_data))
+        if isinstance(all_data, dict):
+            return gpd.GeoDataFrame.from_features(all_data["features"])
+        else:
+            return pd.DataFrame(all_data)
+    else:
+        # Process all files under prefix
+        blobs = bucket.list_blobs(prefix=prefix)
+        for blob in blobs:
+            if extention and not blob.name.endswith(f".{extention}"):
+                continue
+            print(f"Processing: {blob.name}")
+            content = blob.download_as_text()
+
+            for line in content.splitlines():
+                if line.strip():
+                    all_data.append(json.loads(line))
+        return pd.DataFrame(all_data)
