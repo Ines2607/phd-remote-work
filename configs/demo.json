@@ -1,0 +1,49 @@
+{
+  "extends": "template.json",
+  "region": {
+    "name": "Synthetic Tel Aviv demo",
+    "projected_crs": 2039
+  },
+  "paths": {
+    "dwells_raw": "../demo/data/raw/dwells_raw_{month}.parquet",
+    "dwells": "../demo/data/filtered/data_filtered_{month}.parquet",
+    "boundary": "../demo/data/boundary.geojson",
+    "stat_areas": "../demo/data/stat_areas.geojson",
+    "places": "../demo/data/places.csv",
+    "synthetic_users": "../demo/data/users_truth.csv",
+    "output_dir": "../demo/output"
+  },
+  "stat_areas": {
+    "id_column": "stat_area_id",
+    "name_column": "city_name",
+    "population_column": "population",
+    "extra_columns": [],
+    "exclude_names_from_correlation": []
+  },
+  "aggregation": {
+    "identifier_types": null,
+    "min_total_work_days": 7,
+    "months": ["201911", "202004", "202110"],
+    "min_homes_per_area": 3
+  },
+  "synthetic": {
+    "seed": 42,
+    "months": ["201911", "202004", "202110"],
+    "n_users": 300,
+    "identifier_type_shares": {"GAID": 0.6, "IDFA": 0.4},
+    "bbox": {"lat_min": 32.03, "lat_max": 32.13, "lon_min": 34.76, "lon_max": 34.84},
+    "stat_area_grid": {"rows": 6, "cols": 5},
+    "population_per_area": [800, 4000],
+    "share_with_office": 0.75,
+    "min_home_office_distance_m": 1500,
+    "remote_day_probability": {"201911": 0.08, "202004": 0.75, "202110": 0.35},
+    "office_worker_remote_affinity": [0.3, 1.7],
+    "third_place_probability": 0.25,
+    "n_third_places": 40,
+    "evening_out_probability": 0.3,
+    "observation_probability": 0.7,
+    "non_area_dwell_share": 0.05,
+    "gps_jitter_m": 25,
+    "utc_offset_hours": 2
+  }
+}

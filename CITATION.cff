@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "remote_work_utils: detecting remote work and third-place visits from GPS dwell data"
+authors:
+  - family-names: Tregubova
+    given-names: Inessa
+    affiliation: "The Hebrew University of Jerusalem"
+version: 0.1.0
+date-released: 2026-10-12
+repository-code: "https://github.com/Ines2607/phd-remote-work"
+license: MIT
+keywords:
+  - remote work
+  - working from home
+  - third places
+  - mobility data
+  - GPS
+  - Tel Aviv

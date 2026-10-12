@@ -1,3 +1,20 @@
+import os
+import sys
+import warnings
+
+# 1. Fix for PROJ environment error: ensures the correct proj.db version 
+# from the current conda environment is used.
+if 'PROJ_LIB' not in os.environ:
+    proj_path = os.path.join(sys.prefix, 'share', 'proj')
+    if os.path.exists(os.path.join(proj_path, 'proj.db')):
+        os.environ['PROJ_LIB'] = proj_path
+
+# 2. Suppress specific warnings
+# Suppress pyogrio warning about duplicate feature IDs
+warnings.filterwarnings("ignore", message="Several features with id.*")
+# General suppression
+warnings.filterwarnings("ignore")
+
 import pandas as pd
 import pygeohash
 import pyproj
@@ -5,22 +22,15 @@ from shapely.geometry import Point, Polygon, MultiPolygon
 import geopandas as gpd
 import json
 from shapely.geometry import base
-from google.cloud import bigquery, storage
 from shapely.geometry.polygon import orient
 from shapely.validation import make_valid
 import re
 from shapely.geometry import Polygon, MultiPolygon, GeometryCollection
 from shapely.ops import unary_union
+import configparser
 
 # from shapely.geometry import shape, GeometryCollection
 from shapely import wkt, wkb
-import os
-
-import configparser
-import warnings
-
-# Suppress all warnings
-warnings.filterwarnings("ignore")
 
 # from matplotlib import pyplot as plt
 
@@ -381,6 +391,7 @@ def clean_column_names(df):
     """
 
     cleaned_columns = []
+    seen = {}
 
     for col in df.columns:
         # Replace any character that is not letter, number, or underscore
@@ -391,6 +402,13 @@ def clean_column_names(df):
         new_col = new_col.strip("_")
         # Optional: lowercase everything
         new_col = new_col.lower()
+
+        # Ensure column names are unique (BigQuery + pandas helpers expect this)
+        if new_col in seen:
+            seen[new_col] += 1
+            new_col = f"{new_col}_{seen[new_col]}"
+        else:
+            seen[new_col] = 0
 
         cleaned_columns.append(new_col)
 
@@ -423,11 +441,13 @@ def recreate_table_with_geometry(table_name: str, geog_column: str = "geometry")
 
 
 def upload_table_to_bq(
-    df, dataset, table_name, geometry_column="geometry", project="phd-habidatum"
+    df, dataset, table_name, geometry_column="geometry",
+    project="phd-habidatum", if_table_exist="fail",
+    partition_field=None, partition_type="time",
+    cluster_fields=None,
 ):
     """
-    Upload a dataframe to BigQuery.
-    If geometry_column is specified, fix geometries with make_valid, convert to WKT, and upload as GEOGRAPHY.
+    Upload a dataframe to BigQuery with optional partitioning and clustering.
 
     Args:
         df (pd.DataFrame): dataframe to upload
@@ -435,12 +455,52 @@ def upload_table_to_bq(
         table_name (str): Table name in BigQuery
         geometry_column (str): Column name containing geometries (optional)
         project (str): GCP project ID (default phd-habidatum)
+        if_table_exist (str): 'replace' to overwrite, 'fail' to skip if exists.
+        partition_field (str): Column to partition by (DATE/TIMESTAMP for time, INTEGER for range)
+        partition_type (str): 'time' (default) or 'range'
+        cluster_fields (list[str]): Up to 4 columns to cluster by
     """
+
+    from google.cloud import bigquery
 
     client = bigquery.Client(project=project)
     table_id = f"{dataset}.{table_name}"
 
+    # Check if table exists
+    table_exists = False
+    try:
+        client.get_table(table_id)
+        table_exists = True
+    except Exception:
+        pass
+
+    if table_exists:
+        if if_table_exist == "replace":
+            print(f"Table {table_id} already exists. Removing it...")
+            client.delete_table(table_id)
+        else:
+            print(f"Table {table_id} already exists. Skipping upload.")
+            return
+
     df.columns = clean_column_names(df)
+
+    # BigQuery's load_table_from_dataframe requires unique column names and breaks on
+    # non-unique index when inferring schema. Enforce both.
+    def _ensure_unique_columns(cols):
+        out, seen = [], {}
+        for c in cols:
+            name = c
+            if name in seen:
+                seen[name] += 1
+                name = f"{c}_{seen[name]}"
+            else:
+                seen[name] = 0
+            out.append(name)
+        return out
+
+    df = df.copy()
+    df = df.reset_index(drop=True)
+    df.columns = _ensure_unique_columns(list(df.columns))
 
     if geometry_column in df.columns:
         print(f"geometry column '{geometry_column}' is detected in the dataset")
@@ -489,6 +549,30 @@ def upload_table_to_bq(
         print("No geometry, we autodetect columns")
         job_config = bigquery.LoadJobConfig(autodetect=True)
 
+    # Partitioning
+    if partition_field:
+        if partition_type == "time":
+            job_config.time_partitioning = bigquery.TimePartitioning(
+                field=partition_field
+            )
+            print(f"Time partitioning on '{partition_field}'")
+        elif partition_type == "range":
+            col_min = int(df[partition_field].min())
+            col_max = int(df[partition_field].max()) + 1
+            job_config.range_partitioning = bigquery.RangePartitioning(
+                field=partition_field,
+                range_=bigquery.PartitionRange(
+                    start=col_min, end=col_max, interval=1
+                ),
+            )
+            print(f"Range partitioning on '{partition_field}' "
+                  f"[{col_min}, {col_max})")
+
+    # Clustering
+    if cluster_fields:
+        job_config.clustering_fields = cluster_fields
+        print(f"Clustering on {cluster_fields}")
+
     job = client.load_table_from_dataframe(df, table_id, job_config=job_config)
     job.result()
 
@@ -506,6 +590,8 @@ def read_query_to_dataframe(query, project="phd-habidatum"):
     Returns:
         pd.DataFrame: query results
     """
+    from google.cloud import bigquery
+
     client = bigquery.Client(project=project)
     job_config = bigquery.QueryJobConfig()
     query_job = client.query(query, job_config=job_config)
@@ -551,7 +637,8 @@ def read_query_to_dataframe(query, project="phd-habidatum"):
 
 
 def read_gcs_files_folder(project, bucket_name, prefix, extention=None, file_name=None):
-    # Create client
+    from google.cloud import storage
+
     storage_client = storage.Client(project=project)
     bucket = storage_client.get_bucket(bucket_name)
 
