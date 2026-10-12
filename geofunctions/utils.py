@@ -1,6 +1,7 @@
 import os
 import sys
 import warnings
+from pathlib import Path
 
 # 1. Fix for PROJ environment error: ensures the correct proj.db version 
 # from the current conda environment is used.
@@ -49,7 +50,8 @@ def get_path(data_type, source, filename="", ini_file="settings.ini"):
         str: The full path to the desired directory.
     """
     config = configparser.ConfigParser()
-    config.read(f"../{ini_file}")
+    candidates = [parent / ini_file for parent in Path.cwd().resolve().parents]
+    config.read(next((str(c) for c in candidates if c.exists()), f"../{ini_file}"))
     section = "Paths"
     if not config.has_section(section) or not config.has_option(section, data_type):
         raise ValueError(

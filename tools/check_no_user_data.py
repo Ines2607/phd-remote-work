@@ -7,7 +7,9 @@ Checks every tracked (or staged) file:
 * tables under ``results/`` must not contain device identifiers and, where a
   device-count column exists, every row must reach ``min_devices_per_row``
   from ``configs/public_results.json``;
-* notebooks must have no outputs (the nbstripout filter normally ensures this).
+* notebooks must have no outputs (the nbstripout filter normally ensures this),
+  except where ``.gitattributes`` unsets the filter; their outputs must not
+  contain device identifiers.
 
     python tools/check_no_user_data.py
 """
@@ -15,6 +17,7 @@ Checks every tracked (or staged) file:
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -26,6 +29,7 @@ DATA_SUFFIXES = {".csv", ".parquet", ".geojson", ".jsonl", ".shp", ".gpkg", ".fe
 ALLOWED_DATA_DIRS = ("demo/data/", "results/")
 IDENTIFIER_COLUMNS = {"identifier", "device_id", "gaid", "idfa", "user_id"}
 SYNTHETIC_PREFIX = "synthetic-"
+UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE)
 
 
 def tracked_files() -> list[str]:
@@ -60,10 +64,19 @@ def check_table(path: str, settings: dict) -> list[str]:
     return problems
 
 
+def outputs_allowed(path: str) -> bool:
+    """Outputs are kept only where ``.gitattributes`` unsets the nbstripout filter (``-filter``)."""
+    out = subprocess.run(["git", "check-attr", "filter", "--", path], cwd=ROOT, capture_output=True, text=True)
+    return out.stdout.strip().endswith(": unset")
+
+
 def check_notebook(path: str) -> list[str]:
     notebook = json.loads((ROOT / path).read_text())
-    with_outputs = sum(1 for cell in notebook.get("cells", []) if cell.get("outputs"))
-    return [f"{path}: {with_outputs} cells with outputs"] if with_outputs else []
+    cells = [cell for cell in notebook.get("cells", []) if cell.get("outputs")]
+    if not outputs_allowed(path):
+        return [f"{path}: {len(cells)} cells with outputs"] if cells else []
+    leaking = sum(1 for cell in cells if UUID.search(json.dumps(cell["outputs"])))
+    return [f"{path}: {leaking} cells whose outputs contain device identifiers"] if leaking else []
 
 
 def main() -> int:

@@ -26,6 +26,10 @@
 /demo/001-generate-analyse-dwells/
 /demo/results/
 
+# Cleaning inputs name the removed content and the local source notebooks; only the copies are published
+/research/MANIFEST.yml
+/research/CLEANING_REPORT.md
+
 # Only methodology docs are published from notebook_docs/
 /notebook_docs/*
 !/notebook_docs/methodology/

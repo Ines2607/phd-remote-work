@@ -1,6 +1,6 @@
 """The package reproduces the original paper scripts on synthetic data.
 
-Runs ``research/03-remote-work/legacy/00{1,2,3}-*.py`` (the scripts used for the
+Runs ``research/02-remote-work/legacy/00{1,2,3}-*.py`` (the scripts used for the
 paper) in a temporary folder layout they expect, then runs
 ``remote_work_utils`` on the same filtered dwells and compares the outputs.
 """
@@ -27,7 +27,7 @@ from remote_work_utils.settings import load_settings
 from remote_work_utils.synthetic import generate_month, make_world
 
 REPO = Path(__file__).resolve().parents[2]
-LEGACY = REPO / "research" / "03-remote-work" / "legacy"
+LEGACY = REPO / "research" / "02-remote-work" / "legacy"
 MONTHS = ["201909", "202004"]
 LEGACY_CENSUS_COLUMNS = {
     "stat_area_id": "YISHUV_STAT_2022",
