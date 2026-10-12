@@ -1,0 +1,97 @@
+{
+  "poi_matching": {
+    "radius_m": 40,
+    "projected_crs": 2039
+  },
+  "work_schedule": {
+    "metric": "flag_remote_work_smoothed_max_thresh",
+    "remote_worker_min_share": 0.2,
+    "max_undefined_share": 0.5,
+    "min_total_work_days": 5
+  },
+  "visit_context": {
+    "max_hours_after_previous": 2
+  },
+  "visit_stats": {
+    "time_periods": [
+      {"name": "morning", "start_hour": 6, "end_hour": 10},
+      {"name": "early_afternoon", "start_hour": 10, "end_hour": 14},
+      {"name": "late_afternoon", "start_hour": 14, "end_hour": 19},
+      {"name": "evening", "start_hour": 19, "end_hour": 23}
+    ],
+    "other_time_period": "night",
+    "day_types": {"weekday": [6, 0, 1, 2, 3], "friday": [4], "saturday": [5]},
+    "long_visit_hours": 1,
+    "remote_work_time_periods": ["early_afternoon"],
+    "near_distance_m": 1000,
+    "min_visits": 3
+  },
+  "poi_flags": {
+    "category_suits_rw": [
+      "cafe", "coffee_shop", "tea_house", "bakery", "book_store", "library", "community_center",
+      "cultural_center", "museum", "dessert_restaurant", "breakfast_restaurant", "brunch_restaurant",
+      "cat_cafe", "dog_cafe"
+    ],
+    "category_not_suits_rw": [
+      "office", "corporate_office", "coworking_space", "university", "college", "school", "hospital",
+      "medical_center", "train_station", "bus_station", "airport", "government_office"
+    ],
+    "location_exclusion_counts": [
+      "count_universities", "count_colleges", "count_schools", "count_medical_institutions", "count_transport_hubs"
+    ],
+    "work_zone_column": "flag_work_zone",
+    "behaviour_rw_share_threshold": 0.2
+  },
+  "candidates": {
+    "score_columns": {
+      "score_weekday": "share_weekday",
+      "score_morning": "share_morning",
+      "score_early_afternoon": "share_early_afternoon",
+      "score_stay_long": "avg_duration_hours_weekday",
+      "score_evening": "share_evening",
+      "score_friday": "share_friday",
+      "score_saturday": "share_saturday",
+      "score_home": "share_dwells_home_lt_1km"
+    },
+    "n_std": 2.0,
+    "outstanding_scores": ["score_weekday", "score_morning", "score_early_afternoon", "score_stay_long"],
+    "not_outstanding_scores": ["score_evening", "score_friday", "score_saturday"],
+    "low_scores": ["score_home"]
+  },
+  "pu_model": {
+    "target": "flag_keyword_review_rw",
+    "C": 0.03,
+    "l1_ratio": 0.5,
+    "max_iter": 2000,
+    "random_state": 42,
+    "prediction_threshold": 0.5,
+    "validation": {
+      "holdout_frac": 0.3,
+      "n_repeats": 100,
+      "top_k_values": [25, 50, 100, 250],
+      "C_grid": [0.03, 0.1, 0.3, 1.0],
+      "l1_ratio_grid": [0.25, 0.5, 0.75],
+      "top_share_step": 0.01,
+      "stability_top_k": 100
+    },
+    "imputation": {
+      "pricerange": "mean",
+      "avg_dist_home": "mean",
+      "avg_duration_hours_weekday": "mean",
+      "share_weekday": "mean",
+      "share_friday": "mean",
+      "share_dwells_home_lt_1km": "mean",
+      "share_visits_after_home": "mean",
+      "share_visits_after_work": "mean",
+      "n_visits_weekday": "zero",
+      "visit_frequency": "zero",
+      "visit_frequency_rw": "zero",
+      "n_visits_weekday_rw": "zero"
+    }
+  },
+  "mobility": {
+    "local_radius_m": 1000,
+    "coord_decimals": 5,
+    "projected_crs": 2039
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "day_parts": [
+    {"name": "MORNING", "start_hour": 6, "end_hour": 9},
+    {"name": "LATE_MORNING", "start_hour": 9, "end_hour": 12},
+    {"name": "AFTERNOON", "start_hour": 12, "end_hour": 17},
+    {"name": "EVENING", "start_hour": 17, "end_hour": 23}
+  ],
+  "other_day_part": "NIGHT",
+  "corpus": {
+    "scheme": 3,
+    "min_duration_hours": 0.16667,
+    "session_gap_hours": 3,
+    "min_poi_count": 10,
+    "workdays_only": true
+  },
+  "scheme5": {
+    "core_area_prefix": "5000",
+    "core_label": "TLV",
+    "other_label": "NOT_TLV"
+  },
+  "word2vec": {
+    "vector_size": 100,
+    "window": 2,
+    "min_count": 5,
+    "sg": 1,
+    "negative": 15,
+    "epochs": 10,
+    "workers": 1,
+    "seed": 42,
+    "sample": 0
+  },
+  "alignment": {
+    "min_anchor": 10
+  },
+  "similarity": {
+    "poi_periods": ["MORNING", "LATE_MORNING", "AFTERNOON", "EVENING"],
+    "daytime_periods": ["MORNING", "LATE_MORNING", "AFTERNOON"],
+    "evening_periods": ["EVENING", "NIGHT"],
+    "work_threshold": 0.8,
+    "min_centroid_similarity": 0.0
+  },
+  "periods": {
+    "pre_covid": ["201901", "201904", "201907", "201909", "202001"],
+    "post_immediate": ["202006", "202011", "202102", "202103", "202104", "202105"],
+    "post_1year": ["202201", "202203", "202207", "202211", "202302", "202304", "202306", "202309"]
+  }
+}

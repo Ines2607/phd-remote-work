@@ -7,10 +7,15 @@ Behaviour per user and day (local time, workday calendar from settings):
 
 * nights and Shabbat / holidays at home;
 * office workers go to the office on workdays, or stay home on remote days
-  (probability ``remote_day_probability[month] * personal affinity``), with
-  occasional third-place visits in the day or evening;
-* users without an office spend workdays at home or at third places;
+  (probability ``remote_day_probability[month] * personal affinity``);
+* on remote days (and every workday of users without an office) some users
+  work from a work-friendly third place (cafe, coworking, library) in the
+  late morning; evenings and weekend outings go to leisure places;
 * each dwell is observed with a user-specific probability (data sparsity).
+
+Day timings are the ``schedule`` templates: ``[kind, [start_min, start_max],
+[end_min, end_max]]`` in hours from local midnight, where ``kind`` is
+``home``, ``office`` or a key of ``place_categories``.
 """
 
 from __future__ import annotations
@@ -26,8 +31,6 @@ from shapely.geometry import box
 from remote_work_utils import workdays
 
 METERS_PER_DEGREE_LAT = 111_320
-THIRD_PLACE_CATEGORIES = ["cafe", "coworking", "library", "gym", "park", "restaurant", "bar", "mall"]
-WORK_FRIENDLY_CATEGORIES = {"cafe", "coworking", "library"}
 
 
 @dataclass
@@ -84,7 +87,8 @@ def make_world(params: dict[str, Any]) -> SyntheticWorld:
     home_lon = rng.uniform(bounds[:, 0], bounds[:, 2])
     home_lat = rng.uniform(bounds[:, 1], bounds[:, 3])
 
-    n_hubs = max(3, n_users // 40)
+    hubs = params["office_hubs"]
+    n_hubs = max(hubs["min_hubs"], n_users // hubs["users_per_hub"])
     hub_lat = rng.uniform(bbox["lat_min"], bbox["lat_max"], n_hubs)
     hub_lon = rng.uniform(bbox["lon_min"], bbox["lon_max"], n_hubs)
     has_office = rng.random(n_users) < params["share_with_office"]
@@ -98,7 +102,7 @@ def make_world(params: dict[str, Any]) -> SyntheticWorld:
             has_office[user] = False
             continue
         hub = rng.choice(far)
-        dlat, dlon = _meters_to_degrees(rng.normal(0, 150, 2), mid_lat)
+        dlat, dlon = _meters_to_degrees(rng.normal(0, hubs["office_jitter_m"], 2), mid_lat)
         office_lat[user], office_lon[user] = hub_lat[hub] + dlat[0], hub_lon[hub] + dlon[1]
 
     types = list(params["identifier_type_shares"])
@@ -116,26 +120,34 @@ def make_world(params: dict[str, Any]) -> SyntheticWorld:
             "office_lon": office_lon,
             "remote_affinity": rng.uniform(low_aff, high_aff, n_users),
             "observation_rate": np.clip(
-                rng.normal(params["observation_probability"], 0.15, n_users), 0.35, 0.98
+                rng.normal(params["observation_probability"], params["observation_sd"], n_users),
+                *params["observation_bounds"],
             ),
         }
     )
 
     n_places = params["n_third_places"]
+    groups = params["place_categories"]
+    group = rng.choice(list(groups), size=n_places, p=[params["place_group_shares"][g] for g in groups])
     places = pd.DataFrame(
         {
             "place_id": [f"place-{i:03d}" for i in range(n_places)],
-            "category": rng.choice(THIRD_PLACE_CATEGORIES, size=n_places),
+            "category": [rng.choice(groups[g]) for g in group],
+            "place_group": group,
             "lat": rng.uniform(bbox["lat_min"], bbox["lat_max"], n_places),
             "lon": rng.uniform(bbox["lon_min"], bbox["lon_max"], n_places),
         }
     )
-    favourites = []
-    for user in users.itertuples():
-        distance = _distance_m(user.home_lat, user.home_lon, places["lat"], places["lon"])
-        nearest = np.argsort(distance)[:8]
-        favourites.append(list(places["place_id"].to_numpy()[rng.choice(nearest, size=3, replace=False)]))
-    users["favourite_places"] = favourites
+    favourites = params["favourite_places"]
+    for name in groups:
+        candidates = places[places["place_group"] == name]
+        chosen = []
+        for user in users.itertuples():
+            distance = _distance_m(user.home_lat, user.home_lon, candidates["lat"], candidates["lon"])
+            nearest = np.argsort(distance)[: favourites["nearest_candidates"]]
+            size = min(favourites["per_group"], len(nearest))
+            chosen.append(list(candidates["place_id"].to_numpy()[rng.choice(nearest, size=size, replace=False)]))
+        users[f"favourite_{name}"] = chosen
 
     boundary = gpd.GeoDataFrame(
         {"name": ["synthetic boundary"]},
@@ -145,37 +157,32 @@ def make_world(params: dict[str, Any]) -> SyntheticWorld:
     return SyntheticWorld(users=users, places=places, stat_areas=stat_areas, boundary=boundary)
 
 
+def _day_template(user, day: pd.Timestamp, non_workday: bool, remote_p: float, params: dict, rng) -> list[str]:
+    """Names of the schedule templates that make up one local day."""
+    evening_out = rng.random() < params["evening_out_probability"]
+    if non_workday:
+        outing = day.dayofweek != 5 and rng.random() < params["non_workday_outing_probability"]
+        names = ["non_workday_out" if outing else "non_workday_home"]
+    elif user.has_office and rng.random() >= remote_p:
+        names = ["office_day"] + (["evening_out_after_office"] if evening_out else [])
+    else:
+        third_place = rng.random() < params["third_place_probability"]
+        names = ["remote_day_third_place" if third_place else "remote_day_home"]
+        names += ["evening_out"] if evening_out else []
+    return names + ["night"]
+
+
 def _day_plan(user, day: pd.Timestamp, non_workday: bool, remote_p: float, params: dict, rng) -> list[tuple]:
     """List of (place_kind, place_ref, start, end) for one local day."""
-    h = lambda hours: day + pd.Timedelta(hours=float(hours))  # noqa: E731
     plan = []
-    evening_out = rng.random() < params["evening_out_probability"]
-    favourite = lambda: rng.choice(user.favourite_places)  # noqa: E731
-    is_shabbat = day.dayofweek == 5
-
-    if non_workday:
-        plan.append(("home", None, h(rng.uniform(7.5, 9.5)), h(rng.uniform(12, 14))))
-        if not is_shabbat and rng.random() < 0.6:
-            plan.append(("third_place", favourite(), h(rng.uniform(14, 15)), h(rng.uniform(16, 18))))
-            plan.append(("home", None, h(rng.uniform(18, 19)), h(rng.uniform(20.5, 21.5))))
-        else:
-            plan.append(("home", None, h(rng.uniform(14, 15)), h(rng.uniform(20.5, 21.5))))
-    elif user.has_office and rng.random() >= remote_p:
-        plan.append(("office", None, h(rng.uniform(8.3, 9.5)), h(rng.uniform(12.3, 13))))
-        plan.append(("office", None, h(rng.uniform(13.5, 14)), h(rng.uniform(17, 18.5))))
-        if evening_out:
-            plan.append(("third_place", favourite(), h(rng.uniform(19, 19.5)), h(rng.uniform(20.5, 21.5))))
-    else:
-        if rng.random() < params["third_place_probability"]:
-            plan.append(("home", None, h(rng.uniform(7.5, 8.5)), h(rng.uniform(11, 12))))
-            plan.append(("third_place", favourite(), h(rng.uniform(12.5, 13)), h(rng.uniform(14.5, 15.5))))
-            plan.append(("home", None, h(rng.uniform(16, 16.5)), h(rng.uniform(18.5, 19.5))))
-        else:
-            plan.append(("home", None, h(rng.uniform(7.5, 8.5)), h(rng.uniform(12.5, 13.5))))
-            plan.append(("home", None, h(rng.uniform(13.6, 14)), h(rng.uniform(18.5, 19.5))))
-        if evening_out:
-            plan.append(("third_place", favourite(), h(rng.uniform(19.8, 20.2)), h(rng.uniform(21, 21.8))))
-    plan.append(("home", None, h(rng.uniform(22, 23.5)), h(24 + rng.uniform(6.5, 8))))
+    for name in _day_template(user, day, non_workday, remote_p, params, rng):
+        for kind, start, end in params["schedule"][name]:
+            begin = day + pd.Timedelta(hours=float(rng.uniform(*start)))
+            finish = day + pd.Timedelta(hours=float(rng.uniform(*end)))
+            if kind in ("home", "office"):
+                plan.append((kind, None, begin, finish))
+            else:
+                plan.append(("third_place", rng.choice(getattr(user, f"favourite_{kind}")), begin, finish))
     return plan
 
 
@@ -191,7 +198,7 @@ def generate_month(world: SyntheticWorld, month: str, params: dict[str, Any], ca
 
     rows = []
     for user in world.users.itertuples():
-        remote_p = min(0.95, remote_base * user.remote_affinity)
+        remote_p = min(params["max_remote_day_probability"], remote_base * user.remote_affinity)
         for day in days:
             for kind, ref, start, end in _day_plan(user, day, non_workday[day], remote_p, params, rng):
                 if rng.random() > user.observation_rate:
@@ -216,14 +223,14 @@ def generate_month(world: SyntheticWorld, month: str, params: dict[str, Any], ca
             "identifier_type": dwells["identifier_type"],
             "timestamp": dwells["local_start"] - utc_offset,
             "local_date_time": dwells["local_start"],
-            "province": "Tel Aviv",
+            "province": params["province"],
             "classification": np.where(
                 rng.random(len(dwells)) < params["non_area_dwell_share"], "STOP", "AREA_DWELL"
             ),
             "duration_seconds": (dwells["local_end"] - dwells["local_start"]).dt.total_seconds(),
             "centroid_latitude": dwells["lat"] + dlat[0],
             "centroid_longitude": dwells["lon"] + dlon[1],
-            "bump_count": rng.poisson(3, len(dwells)) + 1,
+            "bump_count": rng.poisson(params["bump_count_mean"], len(dwells)) + 1,
             "potential_start_time": dwells["local_start"] - utc_offset,
             "potential_end_time": dwells["local_end"] - utc_offset,
             "true_place_kind": dwells["place_kind"],

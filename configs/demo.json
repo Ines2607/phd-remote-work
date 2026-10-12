@@ -30,13 +30,28 @@
     "seed": 42,
     "months": ["201911", "202004", "202110"],
     "n_users": 300,
-    "identifier_type_shares": {"GAID": 0.6, "IDFA": 0.4},
-    "bbox": {"lat_min": 32.03, "lat_max": 32.13, "lon_min": 34.76, "lon_max": 34.84},
-    "stat_area_grid": {"rows": 6, "cols": 5},
+    "identifier_type_shares": {
+      "GAID": 0.6,
+      "IDFA": 0.4
+    },
+    "bbox": {
+      "lat_min": 32.03,
+      "lat_max": 32.13,
+      "lon_min": 34.76,
+      "lon_max": 34.84
+    },
+    "stat_area_grid": {
+      "rows": 6,
+      "cols": 5
+    },
     "population_per_area": [800, 4000],
     "share_with_office": 0.75,
     "min_home_office_distance_m": 1500,
-    "remote_day_probability": {"201911": 0.08, "202004": 0.75, "202110": 0.35},
+    "remote_day_probability": {
+      "201911": 0.08,
+      "202004": 0.75,
+      "202110": 0.35
+    },
     "office_worker_remote_affinity": [0.3, 1.7],
     "third_place_probability": 0.25,
     "n_third_places": 40,
@@ -44,6 +59,62 @@
     "observation_probability": 0.7,
     "non_area_dwell_share": 0.05,
     "gps_jitter_m": 25,
-    "utc_offset_hours": 2
+    "utc_offset_hours": 2,
+    "max_remote_day_probability": 0.95,
+    "observation_sd": 0.15,
+    "observation_bounds": [0.35, 0.98],
+    "office_hubs": {
+      "users_per_hub": 40,
+      "min_hubs": 3,
+      "office_jitter_m": 150
+    },
+    "place_categories": {
+      "work_friendly": ["cafe", "coworking", "library"],
+      "leisure": ["gym", "park", "restaurant", "bar", "mall"]
+    },
+    "place_group_shares": {
+      "work_friendly": 0.4,
+      "leisure": 0.6
+    },
+    "favourite_places": {
+      "nearest_candidates": 8,
+      "per_group": 2
+    },
+    "non_workday_outing_probability": 0.6,
+    "province": "Tel Aviv",
+    "bump_count_mean": 3,
+    "schedule": {
+      "non_workday_out": [
+        ["home", [7.5, 9.5], [12, 14]],
+        ["leisure", [14, 15], [16, 18]],
+        ["home", [18, 19], [20.5, 21.5]]
+      ],
+      "non_workday_home": [
+        ["home", [7.5, 9.5], [12, 14]],
+        ["home", [14, 15], [20.5, 21.5]]
+      ],
+      "office_day": [
+        ["office", [8.3, 9.5], [12.3, 13]],
+        ["office", [13.5, 14], [17, 18.5]]
+      ],
+      "remote_day_third_place": [
+        ["home", [7.5, 8.5], [9.3, 9.8]],
+        ["work_friendly", [10, 11], [13.5, 15]],
+        ["home", [15.5, 16], [18.5, 19.5]]
+      ],
+      "remote_day_home": [
+        ["home", [7.5, 8.5], [12.5, 13.5]],
+        ["home", [13.6, 14], [18.5, 19.5]]
+      ],
+      "evening_out_after_office": [
+        ["leisure", [19, 19.5], [20.5, 21.5]]
+      ],
+      "evening_out": [
+        ["leisure", [19.8, 20.2], [21, 21.8]]
+      ],
+      "night": [
+        ["home", [22, 23.5], [30.5, 32]]
+      ]
+    }
   }
 }

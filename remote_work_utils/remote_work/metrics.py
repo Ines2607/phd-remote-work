@@ -17,7 +17,14 @@ import pandas as pd
 from remote_work_utils.remote_work.hourly import PROBABILITY_COLUMNS
 
 SELECTED_METRIC = "flag_remote_work_smoothed_max_thresh"
-CORE_USER_COLUMNS = ["identifier", "identifier_type", "total_work_days", "office_day_counts", SELECTED_METRIC]
+CORE_USER_COLUMNS = [
+    "identifier",
+    "identifier_type",
+    "total_work_days",
+    "office_day_counts",
+    "remote_work_days_min_work",
+    SELECTED_METRIC,
+]
 
 
 def general_location_shares(hours: pd.DataFrame) -> pd.DataFrame:

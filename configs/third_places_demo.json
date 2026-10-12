@@ -1,0 +1,19 @@
+{
+  "extends": "third_places.json",
+  "candidates": {
+    "n_std": 1.0,
+    "outstanding_scores": ["score_weekday", "score_early_afternoon", "score_stay_long"],
+    "not_outstanding_scores": ["score_evening", "score_saturday"],
+    "low_scores": []
+  },
+  "pu_model": {
+    "C": 1.0,
+    "validation": {
+      "n_repeats": 20,
+      "top_k_values": [5, 10, 20],
+      "C_grid": [0.3, 1.0, 3.0],
+      "l1_ratio_grid": [0.5],
+      "stability_top_k": 10
+    }
+  }
+}
