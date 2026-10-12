@@ -1,0 +1,53 @@
+{
+  "source_dir": "../data/results",
+  "target_dir": "../results",
+  "min_devices_per_row": 3,
+  "datasets": [
+    {
+      "source": "key-datasets/remote_work_stat_areas_210325.geojson",
+      "target": "datasets/remote_work_stat_area_monthly.csv",
+      "columns": ["YISHUV_STAT_2022", "SHEM_YISHUV_HEB", "Main_Function_Txt", "month", "num_homes", "WFH_mean"],
+      "device_count_column": "num_homes"
+    },
+    {
+      "source": "key-datasets/home_stat_areas_key_features.geojson",
+      "target": "datasets/commute_census_stat_area_monthly.csv",
+      "columns": [
+        "YISHUV_STAT_2022_home", "month", "users", "days", "rw_level_sum", "rw_level", "distance",
+        "weekly_distance", "weekly_wght_distance", "Main_Function_Txt", "pop_approx", "Empl_pcnt",
+        "WrkOutLoc_pcnt", "HrsWrkWk_avg", "IndstJ_pcnt", "IndstK_pcnt", "IndstM_pcnt", "IndstC_pcnt",
+        "IndstQ_pcnt", "Occup1_pcnt", "Occup2_pcnt", "Occup4_pcnt"
+      ],
+      "device_count_column": "users"
+    },
+    {
+      "source": "key-datasets/remote_work_statistic.csv",
+      "target": "datasets/remote_work_monthly.csv",
+      "columns": ["month", "flag_remote_work_smoothed_max_thresh", "flag_remote_work_smoothed_max", "remote_work_share_min_work"],
+      "device_count_column": null
+    }
+  ],
+  "boundaries": {
+    "source": "key-datasets/remote_work_stat_areas_210325.geojson",
+    "target": "datasets/stat_areas_gushdan.geojson",
+    "id_column": "YISHUV_STAT_2022",
+    "columns": ["YISHUV_STAT_2022", "SHEM_YISHUV_HEB", "Main_Function_Txt"],
+    "simplify_tolerance_m": 5,
+    "projected_crs": 2039
+  },
+  "figures": [
+    "diagrams/original_size_monthly.png",
+    "diagrams/filtered_users_share_monthly.png",
+    "diagrams/avg_num_geohashes_user.png",
+    "diagrams/avg_frequency_most_popular_geohash.png",
+    "diagrams/num_geohashes_monthly.png",
+    "diagrams/num_stat_areas_monthly.png",
+    "diagrams/final_num_homes_works.png",
+    "diagrams/home-pop-corr.png",
+    "diagrams/share_pop_stat_areas_with_HL_monthly.png",
+    "diagrams/wfh_share_skilled_workers.png",
+    "diagrams/home-work-hours-plots/work_home_hours_202001.png",
+    "diagrams/home-work-hours-plots/work_home_hours_202005.png",
+    "diagrams/home-work-hours-plots/work_home_hours_202203.png"
+  ]
+}
