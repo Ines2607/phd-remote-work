@@ -1,0 +1,5 @@
+*.ipynb filter=nbstripout
+*.zpln filter=nbstripout
+*.ipynb diff=ipynb
+# Research records published with their original outputs (scanned by tools/check_no_user_data.py)
+research/02-remote-work/01-home-work-patterns-research.ipynb -filter

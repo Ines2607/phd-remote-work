@@ -1,0 +1,37 @@
+{
+  "extends": "../template.json",
+  "region": {
+    "name": "Gush Dan (Tel Aviv metropolitan core)",
+    "projected_crs": 2039
+  },
+  "paths": {
+    "dwells_raw": "{raw}/data_dwells/{month}_full.parquet",
+    "dwells": "{raw}/data_dwells/data_filtered_{month}.parquet",
+    "boundary": "{processed}/data_adm/gushdan_polygon.geojson",
+    "stat_areas": "{processed}/data_census/census_gushdan_main_features.geojson",
+    "output_dir": "{processed}/data_dwells"
+  },
+  "geohash": {
+    "precision": 7,
+    "lonlat_swapped": true
+  },
+  "stat_areas": {
+    "id_column": "YISHUV_STAT_2022",
+    "name_column": "SHEM_YISHUV_ENG",
+    "population_column": "pop_approx",
+    "extra_columns": ["WrkOutLoc_pcnt"],
+    "exclude_names_from_correlation": ["BENE BERAQ"]
+  },
+  "aggregation": {
+    "identifier_types": null,
+    "min_total_work_days": 7,
+    "months": [
+      "202001", "202003", "202005", "202007", "202008", "202009", "202010", "202011",
+      "202102", "202103", "202104", "202105", "202106", "202107", "202112",
+      "202201", "202202", "202203", "202204", "202205", "202207", "202208", "202209",
+      "202210", "202211",
+      "202301", "202302", "202303", "202304", "202305", "202306", "202309"
+    ],
+    "min_homes_per_area": 3
+  }
+}

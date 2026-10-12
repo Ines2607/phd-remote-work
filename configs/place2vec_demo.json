@@ -1,0 +1,14 @@
+{
+  "extends": "place2vec.json",
+  "corpus": {
+    "min_poi_count": 3
+  },
+  "word2vec": {
+    "min_count": 2
+  },
+  "periods": {
+    "pre_covid": ["201911"],
+    "post_immediate": ["202004"],
+    "post_1year": ["202110"]
+  }
+}

@@ -1,0 +1,130 @@
+{
+  "region": {
+    "name": "template",
+    "projected_crs": 2039
+  },
+  "paths": {
+    "dwells_raw": "{raw}/data_dwells/raw_{month}.parquet",
+    "dwells": "{raw}/data_dwells/data_filtered_{month}.parquet",
+    "boundary": "{processed}/data_adm/boundary.geojson",
+    "stat_areas": "{processed}/data_census/stat_areas.geojson",
+    "output_dir": "{processed}/data_dwells"
+  },
+  "outputs": {
+    "homes": "home/home_geohashes_night_shabbat_{month}.csv",
+    "home_stat_areas": "home/home_stat_areas_night_shabbat_{month}.geojson",
+    "work": "work/users_work_home_{month}.csv",
+    "remote_work_users": "remote_work/user_remote_work_{month}.csv",
+    "remote_work_hour_stats": "remote_work/remote_work_stats_hour_date_{month}.csv",
+    "hours_plot": "figures/work_home_hours_{month}.png",
+    "visits": "third_places/visits_{month}.parquet",
+    "metrics_log": "logs/monthly_metrics.jsonl"
+  },
+  "input": {
+    "columns": {
+      "identifier": "identifier",
+      "identifier_type": "identifier_type",
+      "geohash": "geohash",
+      "start_date_time": "start_date_time",
+      "end_date_time": "end_date_time",
+      "date": "date",
+      "duration_hours": "duration_hours",
+      "the_geom": "the_geom"
+    },
+    "crs": 4326
+  },
+  "geohash": {
+    "precision": 7,
+    "lonlat_swapped": false
+  },
+  "calendar": {
+    "weekend_days": [4, 5],
+    "holiday_calendar": {
+      "country": "IL",
+      "subdivision": null,
+      "include_eve": true,
+      "include_dates": ["2019-04-09", "2019-09-17", "2021-03-23", "2022-11-01", "2024-02-27"],
+      "exclude_dates": []
+    },
+    "hour_windows": {
+      "night": [
+        {"start_hour": 0, "end_hour": 9},
+        {"start_hour": 22, "end_hour": 24}
+      ],
+      "shabbat": [
+        {"weekdays": [4], "start_hour": 18, "end_hour": 24},
+        {"weekdays": [5], "start_hour": 0, "end_hour": 18}
+      ],
+      "core_work": [
+        {"start_hour": 11, "end_hour": 17}
+      ]
+    }
+  },
+  "prepare": {
+    "min_duration_seconds": 180,
+    "provinces": null,
+    "clip_to_boundary": true,
+    "min_dwells_per_user": 4,
+    "classifications": ["AREA_DWELL"],
+    "dwell_flags": {
+      "night_start_hour": 22,
+      "night_end_hour": 7,
+      "work_start_hour": 9,
+      "work_end_hour": 19,
+      "work_weekdays": [6, 0, 1, 2, 3]
+    },
+    "min_night_dates": 2,
+    "min_work_dates": 2
+  },
+  "dwell_stats": {
+    "min_duration_seconds": 180,
+    "dwell_quantiles": [0.25, 0.5, 0.75, 0.9, 0.95],
+    "dwell_count_bins": [1, 2, 4, 10, 20],
+    "long_dwell_hours": [2, 4],
+    "time_periods": [
+      {"name": "morning", "start_hour": 4, "end_hour": 8},
+      {"name": "day", "start_hour": 8, "end_hour": 16},
+      {"name": "evening", "start_hour": 16, "end_hour": 20}
+    ],
+    "other_time_period": "night",
+    "outliers": {"n_std": 2, "remove_outlier_pct": 25, "warning_outlier_pct": 10}
+  },
+  "home_location": {
+    "top_geohashes_per_user": 5,
+    "min_night_hours_count": 2,
+    "min_shabbat_hours_count": 1,
+    "diagnostics": {
+      "frequent_hour_min_count": 2,
+      "min_frequent_home_hours": 2,
+      "min_frequent_work_hours": 2
+    }
+  },
+  "work_location": {
+    "home_radius_meters": 250,
+    "min_distance_home_work_meters": 1000,
+    "min_candidate_hours": 3,
+    "min_candidate_days": 2,
+    "min_candidate_hours_one_day": 2
+  },
+  "remote_work": {
+    "location_radius_meters": 250,
+    "working_hour_start": 8,
+    "working_hour_end": 18,
+    "smoothed_day_threshold": 0.5,
+    "min_work_probability": 0.5,
+    "output_all_variants": false
+  },
+  "stat_areas": {
+    "id_column": "stat_area_id",
+    "name_column": "city_name",
+    "population_column": "population",
+    "extra_columns": [],
+    "exclude_names_from_correlation": []
+  },
+  "aggregation": {
+    "identifier_types": null,
+    "min_total_work_days": 7,
+    "months": [],
+    "min_homes_per_area": 3
+  }
+}

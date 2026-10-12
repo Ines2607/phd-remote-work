@@ -1,0 +1,65 @@
+{
+  "project": "phd-habidatum",
+  "tables": {
+    "dwells_raw": "phd-habidatum.phd_dwells.dwells_monthly_fltrd",
+    "work_locations": "phd-habidatum.phd_users_locations.work_locations",
+    "geohash_stat_areas": "phd-habidatum.phd_adm.geohashes_with_sa_gushdan",
+    "google_pois": "phd-habidatum.phd_pois.google_3rdplaces_cities",
+    "osm_pois": "mapinamo-2.isr_pois.pois_merged_frsq_osm",
+    "dwells_pois": "phd-habidatum.phd_dwells.dwells_pois_home_work",
+    "user_profiles": "phd-habidatum.phd_datasets.user_profiles_monthly",
+    "geohash_context": "phd-habidatum.phd_adm.geohashes_with_sa_gushdan_context",
+    "geohash_features": "phd-habidatum.phd_datasets.geohash_features",
+    "google_pois_features": "phd-habidatum.phd_pois.google_pois_features",
+    "neighbourhood_types": "phd-habidatum.phd_datasets.sa_neigborhoods_types_new"
+  },
+  "periods": {
+    "pre_covid": [
+      "2019-01-01",
+      "2019-04-01",
+      "2019-07-01",
+      "2019-09-01",
+      "2020-01-01"
+    ],
+    "post_immediate": [
+      "2020-06-01",
+      "2020-11-01",
+      "2021-02-01",
+      "2021-03-01",
+      "2021-04-01",
+      "2021-05-01"
+    ],
+    "post_1year": [
+      "2022-01-01",
+      "2022-03-01",
+      "2022-07-01",
+      "2022-11-01",
+      "2023-02-01",
+      "2023-04-01",
+      "2023-06-01",
+      "2023-09-01"
+    ]
+  },
+  "election_days": [
+    "2019-04-09",
+    "2019-09-17",
+    "2021-03-23",
+    "2022-11-01",
+    "2024-02-27"
+  ],
+  "poi_day_periods": [
+    "MORNING",
+    "LATE_MORNING",
+    "AFTERNOON",
+    "EVENING"
+  ],
+  "daytime_work_columns": [
+    "Morning_WORK",
+    "LATE_Morning_WORK",
+    "Afternoon_WORK"
+  ],
+  "evening_night_work_columns": [
+    "Evening_WORK",
+    "Night_WORK"
+  ]
+}
