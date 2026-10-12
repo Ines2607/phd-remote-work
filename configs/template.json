@@ -17,6 +17,7 @@
     "remote_work_users": "remote_work/user_remote_work_{month}.csv",
     "remote_work_hour_stats": "remote_work/remote_work_stats_hour_date_{month}.csv",
     "hours_plot": "figures/work_home_hours_{month}.png",
+    "visits": "third_places/visits_{month}.parquet",
     "metrics_log": "logs/monthly_metrics.jsonl"
   },
   "input": {
@@ -74,6 +75,19 @@
     },
     "min_night_dates": 2,
     "min_work_dates": 2
+  },
+  "dwell_stats": {
+    "min_duration_seconds": 180,
+    "dwell_quantiles": [0.25, 0.5, 0.75, 0.9, 0.95],
+    "dwell_count_bins": [1, 2, 4, 10, 20],
+    "long_dwell_hours": [2, 4],
+    "time_periods": [
+      {"name": "morning", "start_hour": 4, "end_hour": 8},
+      {"name": "day", "start_hour": 8, "end_hour": 16},
+      {"name": "evening", "start_hour": 16, "end_hour": 20}
+    ],
+    "other_time_period": "night",
+    "outliers": {"n_std": 2, "remove_outlier_pct": 25, "warning_outlier_pct": 10}
   },
   "home_location": {
     "top_geohashes_per_user": 5,

@@ -31,4 +31,10 @@ from remote_work_utils.third_places.pu_model import (
     positive_holdout_validation,
     top_k_stability,
 )
-from remote_work_utils.third_places.visits import add_areas, add_visit_context, match_pois, work_schedule
+from remote_work_utils.third_places.visits import (
+    add_areas,
+    add_visit_context,
+    match_pois,
+    visits_for_month,
+    work_schedule,
+)

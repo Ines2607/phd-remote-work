@@ -26,7 +26,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-_MISSING = {"nan": "", "None": "", "<NA>": ""}
+_MISSING = {"nan", "None", "<NA>"}
 
 
 def day_part(hours: pd.Series, config: dict[str, Any]) -> pd.Series:
@@ -37,9 +37,15 @@ def day_part(hours: pd.Series, config: dict[str, Any]) -> pd.Series:
     return labels
 
 
+def _text(values: pd.Series, missing: str = "") -> pd.Series:
+    """Values as text, with missing values (and their string spellings) set to ``missing``."""
+    text = values.astype(object).where(values.notna(), missing).astype(str)
+    return text.replace({spelling: missing for spelling in _MISSING})
+
+
 def _area_text(area_ids: pd.Series) -> pd.Series:
     """Area ids as text without a float suffix (``1023.0`` -> ``1023``)."""
-    return area_ids.astype(object).where(area_ids.notna(), "").astype(str).str.replace(r"\.0$", "", regex=True)
+    return _text(area_ids).str.replace(r"\.0$", "", regex=True)
 
 
 def _core_label(area_ids: pd.Series, scheme5: dict[str, Any]) -> pd.Series:
@@ -56,16 +62,16 @@ def tokenize_visits(visits: pd.DataFrame, config: dict[str, Any], scheme: int, p
     tokens = pd.Series("", index=visits.index, dtype="object")
     flag_home = visits["flag_home"].fillna(False).astype(bool)
     flag_work = visits["flag_work"].fillna(False).astype(bool)
-    geohash = visits["dwell_geohash"].fillna("").astype(str)
-    poi_id = visits["poi_id"].astype(str).replace(_MISSING)
+    geohash = _text(visits["dwell_geohash"])
+    poi_id = _text(visits["poi_id"])
     has_poi = (poi_id != "") & ~flag_home & ~flag_work
     if poi_whitelist is not None:
         has_poi &= poi_id.isin(poi_whitelist)
     no_poi = ~flag_home & ~flag_work & ~has_poi
 
-    category = visits["pois_category"].fillna("UNKNOWN").astype(str).str.replace(" ", "_")
+    category = _text(visits["pois_category"], "UNKNOWN").str.replace(" ", "_")
     raw_context = visits["context_type"] if "context_type" in visits else pd.Series(pd.NA, index=visits.index)
-    context = raw_context.astype(str).replace({k: "UNKNOWN" for k in _MISSING}).str.replace(" ", "_")
+    context = _text(raw_context, "UNKNOWN").str.replace(" ", "_")
     area = _area_text(visits["census_id_filled"])
     period = day_part(visits["hour"].fillna(0).astype(int), config)
     home_area = _area_text(visits["home_census"])

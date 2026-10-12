@@ -57,6 +57,35 @@ def work_schedule(user_months: pd.DataFrame, params: dict[str, Any]) -> pd.Serie
     )
 
 
+def visits_for_month(
+    dwells: pd.DataFrame,
+    pois: gpd.GeoDataFrame,
+    users_work_home: pd.DataFrame,
+    user_months: pd.DataFrame,
+    stat_areas: gpd.GeoDataFrame,
+    settings: dict[str, Any],
+    params: dict[str, Any],
+) -> pd.DataFrame:
+    """Filtered dwells of users with home and work, matched to POIs and labelled.
+
+    ``pois`` needs ``poi_id`` and point geometry; ``user_months`` is the user
+    remote-work table of the same month. Adds the :func:`add_visit_context`
+    and :func:`add_areas` columns, ``poi_id`` and ``work_schedule``.
+    """
+    from remote_work_utils.geo import to_geometry
+
+    points = dwells.copy()
+    if not isinstance(points, gpd.GeoDataFrame):
+        points["the_geom"] = to_geometry(points["the_geom"])
+        points = gpd.GeoDataFrame(points, geometry="the_geom", crs=4326)
+    matching = params["poi_matching"]
+    points["poi_id"] = match_pois(points, pois, matching["radius_m"], matching["projected_crs"])
+    visits = add_visit_context(points, users_work_home, settings, params["visit_context"])
+    visits = add_areas(visits, stat_areas, settings)
+    schedule = user_months[["identifier"]].assign(work_schedule=work_schedule(user_months, params["work_schedule"]))
+    return pd.DataFrame(visits.merge(schedule, on="identifier", how="left"))
+
+
 def add_visit_context(
     dwells: pd.DataFrame, users_work_home: pd.DataFrame, settings: dict[str, Any], params: dict[str, Any]
 ) -> pd.DataFrame:
