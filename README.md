@@ -1,4 +1,4 @@
-# remote_work_utils
+# PhD on remote work
 
 Detect home, work, remote-work days and third-place visits from GPS dwell data.
 
